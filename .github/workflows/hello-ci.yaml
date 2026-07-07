@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - main
-      - "features/***"
+      - "features/**"
   pull_request:
   schedule:
     - cron: 0 8 * * 0-6
