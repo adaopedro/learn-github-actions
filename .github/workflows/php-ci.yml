@@ -25,3 +25,6 @@ jobs:
           tools: composer:v2, php-cs-fixer, phpunit, phpstan
           extensions: mbstring, xml, pdo, pdo_mysql, redis
           coverage: xdebug
+      
+      - name: install deps
+        run: composer install

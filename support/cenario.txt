@@ -1,0 +1,49 @@
+O cenário: transferência bancária entre contas
+A ideia é simples de entender mas rica o suficiente pra expor todos os problemas que transactions resolvem. Vamos por partes.
+O que estamos modelando
+Duas pessoas (Alice e Bob) têm contas num banco. Alice quer transferir 200.000,00 Kz pra Bob. Isso exige duas operações separadas no banco de dados:
+
+Tirar 200.000,00 Kz do saldo da Alice
+Colocar 200.000,00 Kz no saldo do Bob
+
+O problema central: são dois UPDATEs distintos. Entre a execução do primeiro e do segundo, várias coisas podem dar errado — a conexão cai, o servidor reinicia, o PHP lança uma exception, a query do segundo update falha por erro de sintaxe, etc. Se isso acontecer, você fica com o dinheiro sumido do sistema: saiu da Alice mas nunca chegou no Bob. Isso é a definição de inconsistência de dados.
+Por que duas tabelas
+contas guarda o estado atual — quanto cada pessoa tem agora. É a tabela que muda a cada operação.
+transacoes guarda o histórico — um log do que aconteceu. Ela não é estritamente necessária pra transferência funcionar, mas eu incluí de propósito porque é assim que sistemas reais funcionam: você nunca quer só mexer no saldo sem deixar rastro de por quê ele mudou. Isso também aumenta o número de operações dentro da transaction (3 no total: debitar, creditar, logar), o que deixa mais claro por que "tudo ou nada" importa — imagina se debitar e creditar funcionassem mas o log falhasse silenciosamente.
+Onde a transaction entra
+O bloco beginTransaction() → operações → commit() (ou rollBack() se algo falhar) garante que essas 3 operações são tratadas como uma unidade atômica. Ou as três acontecem, ou nenhuma acontece. Não existe estado intermediário visível pra outras conexões.
+Por que o FOR UPDATE
+Esse é o detalhe mais sutil do cenário. Imagina que Alice tem R$1000 e dois processos tentam transferir R$800 cada, ao mesmo tempo:
+
+Processo A lê o saldo: 1000 (ainda não commitou nada)
+Processo B lê o saldo: 1.000,00 (ao mesmo tempo, antes de A commitar)
+Ambos acham que 1.000,00 ≥ 800,00 e seguem em frente
+Os dois debitam — saldo final fica negativo, o que nunca deveria acontecer
+
+A transaction sozinha não impede isso, porque cada processo está numa transaction separada e a leitura (SELECT) por padrão não trava a linha. O FOR UPDATE força esse SELECT a pegar um lock exclusivo na linha da conta — o segundo processo tem que esperar o primeiro terminar (commit ou rollback) antes de conseguir ler, e nesse momento ele já vê o saldo atualizado.
+Esse é o exemplo clássico pra ilustrar a diferença entre atomicidade (que a transaction já te dá de graça) e isolamento contra concorrência (que exige locking explícito, mesmo dentro de uma transaction).
+O cenário: transferência bancária entre contas
+A ideia é simples de entender mas rica o suficiente pra expor todos os problemas que transactions resolvem. Vamos por partes.
+O que estamos modelando
+Duas pessoas (Alice e Bob) têm contas num banco. Alice quer transferir R$200 pra Bob. Isso exige duas operações separadas no banco de dados:
+
+Tirar R$200 do saldo da Alice
+Colocar R$200 no saldo do Bob
+
+O problema central: são dois UPDATEs distintos. Entre a execução do primeiro e do segundo, várias coisas podem dar errado — a conexão cai, o servidor reinicia, o PHP lança uma exception, a query do segundo update falha por erro de sintaxe, etc. Se isso acontecer, você fica com o dinheiro sumido do sistema: saiu da Alice mas nunca chegou no Bob. Isso é a definição de inconsistência de dados.
+Por que duas tabelas
+contas guarda o estado atual — quanto cada pessoa tem agora. É a tabela que muda a cada operação.
+transacoes guarda o histórico — um log do que aconteceu. Ela não é estritamente necessária pra transferência funcionar, mas eu incluí de propósito porque é assim que sistemas reais funcionam: você nunca quer só mexer no saldo sem deixar rastro de por quê ele mudou. Isso também aumenta o número de operações dentro da transaction (3 no total: debitar, creditar, logar), o que deixa mais claro por que "tudo ou nada" importa — imagina se debitar e creditar funcionassem mas o log falhasse silenciosamente.
+Onde a transaction entra
+O bloco beginTransaction() → operações → commit() (ou rollBack() se algo falhar) garante que essas 3 operações são tratadas como uma unidade atômica. Ou as três acontecem, ou nenhuma acontece. Não existe estado intermediário visível pra outras conexões.
+Por que o FOR UPDATE
+Esse é o detalhe mais sutil do cenário. Imagina que Alice tem R$1000 e dois processos tentam transferir R$800 cada, ao mesmo tempo:
+
+Processo A lê o saldo: R$1000 (ainda não commitou nada)
+Processo B lê o saldo: R$1000 (ao mesmo tempo, antes de A commitar)
+Ambos acham que R$1000 ≥ R$800 e seguem em frente
+Os dois debitam — saldo final fica negativo, o que nunca deveria acontecer
+
+A transaction sozinha não impede isso, porque cada processo está numa transaction separada e a leitura (SELECT) por padrão não trava a linha. O FOR UPDATE força esse SELECT a pegar um lock exclusivo na linha da conta — o segundo processo tem que esperar o primeiro terminar (commit ou rollback) antes de conseguir ler, e nesse momento ele já vê o saldo atualizado.
+Esse é o exemplo clássico pra ilustrar a diferença entre atomicidade (que a transaction já te dá de graça) e isolamento contra concorrência (que exige locking explícito, mesmo dentro de uma transaction).
+Quer que eu simule esse cenário de concorrência na prática — dois scripts PHP rodando "ao mesmo tempo" pra você ver o race condition acontecendo sem o FOR UPDATE, e depois resolvido com ele?
