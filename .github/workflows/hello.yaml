@@ -2,7 +2,10 @@ on:
   push:
     branches:
       - main
+      - "features/***"
   pull_request:
+  schedule:
+    - cron: 0 8 * * 0-6
 
 jobs:
   build:

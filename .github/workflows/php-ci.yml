@@ -1,0 +1,27 @@
+name: PHP CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        php-version: 
+          - "8.5"
+          - "5.3"
+    
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+      
+      - name: setup php ${{matrix.php-version}}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{matrix.php-version}}
+          tools: composer:v2, php-cs-fixer, phpunit, phpstan
+          extensions: mbstring, xml, pdo, pdo_mysql, redis
+          coverage: xdebug

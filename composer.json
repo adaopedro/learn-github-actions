@@ -1,0 +1,9 @@
+{
+    "name": "adaopedro/learn-github-actions",
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "require": {}
+}
